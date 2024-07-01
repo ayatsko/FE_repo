@@ -1,0 +1,121 @@
+---
+title: "Untitled"
+author: "abbey yatsko"
+date: "2024-06-27"
+output: html_document
+---
+# libraries 
+```{r}
+library(ggplot2)
+library(ggpubr)
+```
+
+# data load 
+```{r}
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/freq_summary.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/cookie_heights_added_out.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/term_rh.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/term_ah.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/mic_rh.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/mic_ah.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/damaged_trees_long_rep_sp.RData")
+
+alltermites <- read.csv("/Users/abbeyyatsko/Desktop/FE_repo/data/termites_paul - all_ID_new.csv")
+```
+
+aesthetics
+```{r}
+sm <- "#5ec962"
+med <- '#20908c'
+medy <- '#3b528b'
+lg <- '#440153'
+cols <- c(sm, med, medy, lg)
+```
+
+# figure 5 
+```{r}
+ggplot(freq_summary, aes(x = scale , y = proportion, fill = damage))+
+  geom_bar(stat = "identity", position = "stack")+
+  theme_classic()+
+  scale_x_discrete(labels = c("Cross section", "Tree")) +
+  xlab("")+
+  ylab("Proportion")
+```
+
+# figure 3
+```{r}
+term_rheight <- ggplot(cookie_heights_added_out, aes(x = relative_height, y = prop_hollow_tr, color = species)) + 
+  geom_jitter(alpha = 0.25) +
+  geom_line(aes(x=x, y=predicted), 
+            data=filter(term_rh, group =='Corymbia sp. (clarksoniana/novoguinensis) '), 
+            inherit.aes=FALSE, colour=sm) + 
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), 
+              data = filter(term_rh, group == 'Corymbia sp. (clarksoniana/novoguinensis) '), 
+              inherit.aes = FALSE, alpha = 0.2, fill = sm) +
+  geom_line(aes(x=x, y=predicted), 
+            data=filter(term_rh, group=='Eucalyptus tetrodonta'), 
+            inherit.aes=FALSE, colour=med) +
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), 
+              data=filter(term_rh, group=='Eucalyptus tetrodonta'), 
+              inherit.aes=FALSE, alpha=0.2, fill = med)+
+  geom_line(aes(x=x, y=predicted), 
+            data=filter(term_rh, group=='Lophostemon suaveolens'), 
+            inherit.aes=FALSE, colour=medy) + 
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), 
+              data=filter(term_rh, group=='Lophostemon suaveolens'), 
+              inherit.aes=FALSE, alpha=0.2, fill = medy)+
+  geom_line(aes(x=x, y=predicted), 
+            data=filter(term_rh, group=='Planchonia careya'),  
+            inherit.aes=FALSE, colour=lg) + 
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), 
+              data=filter(term_rh, group=='Planchonia careya'), 
+              inherit.aes=FALSE, alpha=0.2, fill = lg)+
+  labs(x = "Relative height in tree (%)", 
+       y = "Proportional termite attributed damage", title = "a) Termite damage") +
+  scale_colour_manual(limits = c("Corymbia sp. (clarksoniana/novoguinensis) ", 
+                                 "Eucalyptus tetrodonta", "Lophostemon suaveolens", 
+                                 "Planchonia careya"), 
+                      labels = c("C. clarksoniana", "E. tetrodonta", "L. suaveolens", 
+                                 "P. careya"), 
+                      values = cols, name = "")+
+  theme_classic()+
+  theme(legend.position = 'none')
+
+mic_rheight <- ggplot(cookie_heights_added_out, aes(x = relative_height, y = prop_rot_tr)) + 
+  geom_jitter(alpha = 0.25) +
+  geom_line(aes(x=x, y=predicted), 
+            data=filter(mic_rh, group=='1'), 
+            inherit.aes=FALSE, colour='black')+ 
+  geom_ribbon(aes(x=x, ymin = conf.low, ymax = conf.high), 
+              data=filter(mic_rh, group=='1'), 
+              inherit.aes=FALSE, alpha=0.2, fill = 'black')+
+  labs(x = "Relative height in tree (%)", y = "% Microbe attributed damage", title = "b) Microbe damage") +
+  theme_classic()
+
+# ggarrange(term_rheight, mic_rheight, ncol = 2)
+```
+
+# figure 4
+```{r}
+ggplot(damaged_trees_long_rep_sp, aes(x = species, y = measurement, fill = condition))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Tree level damage (%)")+
+  xlab("")+
+  scale_fill_brewer("", labels=c('Termite damage', 'Microbial damage'))+
+  theme(legend.position = "top")+
+  scale_x_discrete(limits = c("Corymbia sp. (clarksoniana/novoguinensis) ", "Eucalyptus tetrodonta","Lophostemon suaveolens",  "Planchonia careya"))+
+  scale_fill_manual(values=c("#440153", "#20908c"))
+```
+
+# supplementary figure 1 - termite species data
+```{r}
+ggplot(alltermites, aes(fill=genus, x=niche)) + 
+  geom_bar(position="stack", stat="count")+
+  scale_fill_brewer(palette="Reds")+ 
+  theme_classic()
+```
+
+

@@ -1,0 +1,120 @@
+---
+title: "Untitled"
+author: "abbey yatsko"
+date: "2024-06-27"
+output: html_document
+---
+# libraries 
+```{r}
+library(dplyr)
+library(glmmTMB)
+library(ggeffects)
+library(car)
+library(easystats)
+library(emmeans)
+```
+
+# data load 
+```{r}
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/cookie_chi_long.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/trees_chi_long.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/cookie_heights_added_out.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/damaged_trees_long_rep_sp.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/mo_cookie.RData")
+```
+
+# chi square analysis 
+```{r}
+# define matrix
+cookie_length <- nrow(cookie_chi_long)
+tree_length <- nrow(trees_chi_long)
+cookie_both <- sum(cookie_chi_long$damage == "both")
+tree_both <- sum(trees_chi_long$damage == "both")
+cookie_else <- sum(cookie_chi_long$damage == "microbe_only" | cookie_chi_long$damage == "termite_only" | cookie_chi_long$damage == "no_damage")
+tree_else <- sum(trees_chi_long$damage == "microbe_only" | trees_chi_long$damage == "termite_only" | trees_chi_long$damage == "no_damage")
+
+observed <- matrix(c(cookie_both, ((tree_both*cookie_length))/tree_length, cookie_else, ((tree_else*cookie_length))/tree_length), nrow = 2, byrow = TRUE)
+
+# perform chi-square test
+chi_result <- chisq.test(observed)
+```
+
+# damage at different positions in the tree analysis
+```{r}
+# termite + relative height model 
+m_tr <- glmmTMB(prop_hollow_tr ~ relative_height  + species + (1|tree_ID), 
+             data = cookie_heights_added_out, 
+             family = beta_family(link = "logit"))
+Anova(m_tr) # check_model(m)
+term_rh <- ggpredict(m_tr, terms = c("relative_height", "species")) #%>% plot(add.data = TRUE)
+
+# termite + absolute height model (supplementary table 7)
+m_ta <- glmmTMB(prop_hollow_tr ~ height_m  + species + (1|tree_ID), 
+             data = cookie_heights_added_out, 
+             family = beta_family(link = "logit"))
+Anova(m_ta) # check_model(m)
+term_ah <- ggpredict(m_ta, terms = c("height_m", "species")) #%>% plot(add.data = TRUE)
+
+# microbe + relative height model 
+m_mr <- glmmTMB(prop_rot_tr ~ relative_height  + species + (1|tree_ID), 
+             data = cookie_heights_added_out, 
+             family = beta_family(link = "logit"))
+Anova(m_mr) # check_model(m)
+mic_rh <- ggpredict(m_mr, terms = c("relative_height")) #%>% plot(add.data = TRUE)
+
+# microbe + absolute height model (supplementary table 7)
+m_ma <- glmmTMB(prop_rot_tr ~ height_m  + species + (1|tree_ID), 
+             data = cookie_heights_added_out, 
+             family = beta_family(link = "logit"))
+Anova(m_ma) # check_model(m)
+mic_ah <- ggpredict(m_ma, terms = c("height_m")) #%>% plot(add.data = TRUE)
+
+# model data out 
+# save(term_rh, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/term_rh.RData")
+# save(term_ah, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/term_ah.RData")
+# save(mic_rh, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/mic_rh.RData")
+# save(mic_ah, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/mic_ah.RData")
+```
+
+# species level differences in termite/microbe damage 
+```{r}
+mod_species_damage <- lm(log(measurement+1) ~ species*condition, data = damaged_trees_long_rep_sp)
+summary(mod_species_damage)
+check_model(mod_species_damage)
+species_dam <- ggpredict(mod_species_damage, terms = c( "species", "condition")) %>% plot(add.data = TRUE)
+
+# posthoc pairwise tukey HSD to determine what species had differences in microbe/termite damage
+report(Anova(mod_species_damage))
+x <- emmeans(mod_species_damage, ~species*condition)
+y <- pairs(x, adjust="tukey")
+```
+
+# tree-level factors and damage 
+```{r}
+# just termite 
+mod_termite_treelevel <- lm(log(mu_hol_scaled+1) ~ wd_species_level_field + dbh_observed_cm_tidy, data = damaged_trees)
+summary(mod_termite_treelevel)
+Anova(mod_termite_treelevel)
+check_model(mod_termite_treelevel)
+termite <- ggpredict(mod_termite_treelevel, terms = c("wd_species_level_field")) %>% plot(add.data = TRUE)
+
+mod_microbe_treelevel <- lm(log(mu_rot_scaled+1) ~ wd_species_level_field + dbh_observed_cm_tidy, data = damaged_trees)
+summary(mod_microbe_treelevel)
+Anova(mod_microbe_treelevel)
+check_model(mod_microbe_treelevel)
+microbe <- ggpredict(mod_microbe_treelevel, terms = c("wd_species_level_field")) %>% plot(add.data = TRUE)
+```
+
+# supplementary table 8
+```{r}
+# model 
+m_mo <- glmmTMB(prop_rot_tr ~ relative_height + (1|tree_ID), 
+             data = mo_cookie, 
+             family = beta_family(link = "logit"))
+Anova(m_mo) # check_model(m_mo)
+ggpredict(m_mo, terms = c("relative_height")) %>% plot(add.data = TRUE)
+```
+

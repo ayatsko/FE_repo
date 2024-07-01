@@ -1,0 +1,191 @@
+---
+title: "Untitled"
+author: "abbey yatsko"
+date: "2024-06-27"
+output: html_document
+---
+# libraries 
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+# data load 
+```{r}
+load("/Users/abbeyyatsko/Desktop/FE_repo/data/cookie.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/data/cookie_d.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/data/biomass.RData")
+load("/Users/abbeyyatsko/Desktop/FE_repo/data/tree_level_damage.RData")
+
+load("/Users/abbeyyatsko/Desktop/FE_repo/data/cookie_heights_added_out.RData")
+
+all_biomass <- read.csv("/Users/abbeyyatsko/Desktop/FE_repo/data/Iron_Range_Stem_Damage_master_June_06_23.xlsx - all.csv")
+
+alltermites <- read.csv("/Users/abbeyyatsko/Desktop/FE_repo/data/termites_paul - all_ID_new.csv")
+
+load("/Users/abbeyyatsko/Desktop/repos/ironrange/R/data_out/field_wd_species.RData")
+```
+
+# data format - comparison of microbe/termite damage at cookie/tree levels
+```{r}
+# cookie df formatting 
+cookie$holrot <- ifelse(cookie$hollowed == "y" & cookie$rotted == "y", "y", "n")
+cookie$treepart <- ifelse(cookie$position %in% c("S", "C", "A"), "main stem", "canopy")
+cookie <- cookie %>% relocate(treepart, .after=position)
+
+# create 4 categories: termite_only, microbe_only, both, no_damage
+cookie$termite_only <- ifelse(cookie$hollowed == "y" & cookie$rotted == "n", "y", "n")
+cookie$microbe_only <- ifelse(cookie$hollowed == "n" & cookie$rotted == "y", "y", "n")
+cookie$both <- cookie$holrot
+cookie$no_damage <- ifelse(cookie$hollowed == "n" & cookie$rotted == "n", "y", "n")
+
+# df for chi square test
+cookie_chi <- cookie[27:30]
+cookie_chi_long <- gather(cookie_chi, key = "damage", value = "value")
+cookie_chi_long <- cookie_chi_long %>%
+  filter(value != 'n')
+cookie_chi_long$scale <- "cookie"
+# save(cookie_chi_long, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/cookie_chi_long.RData")
+
+# tree df formatting
+trees <- trees[c("tree_id", "ply_model", "species", "dbh_observed_cm_tidy")]
+trees <- (left_join(trees, dam_scaled, by = c("ply_model", "species")))
+trees$mu_tot_scaled[is.na(trees$mu_tot_scaled)] <- 0
+trees$mu_rot_scaled[is.na(trees$mu_rot_scaled)] <- 0
+trees$mu_hol_scaled[is.na(trees$mu_hol_scaled)] <- 0
+
+# classify damage/no damage by tree average
+trees$damaged <- ifelse(trees$mu_tot_scaled > 0, "Y",  "N")
+trees$rotted <- ifelse(trees$mu_rot_scaled > 0, "Y",  "N")
+trees$hollowed <- ifelse(trees$mu_hol_scaled > 0, "Y",  "N")
+trees$holrot <- ifelse(trees$mu_hol_scaled > 0 & trees$mu_rot_scaled > 0, "Y", "N")
+
+# tree level: create 4 categories: termite_only, microbe_only, both, no_damage
+trees$termite_only <- ifelse(trees$hollowed == "Y" & trees$rotted == "N", "y", "n")
+trees$microbe_only <- ifelse(trees$hollowed == "N" & trees$rotted == "Y", "y", "n")
+trees$both <- trees$holrot
+trees <- trees %>% mutate(both = tolower(both))
+trees$no_damage <- ifelse(trees$hollowed == "N" & trees$rotted == "N", "y", "n")
+
+# df for chi square test 
+trees_chi <- trees[13:16]
+trees_chi_long <- gather(trees_chi, key = "damage", value = "value")
+trees_chi_long <- trees_chi_long %>%
+  filter(value != 'n')
+trees_chi_long$scale <- "tree"
+# save(trees_chi_long, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/trees_chi_long.RData")
+
+# merge cookie  and tree level df
+merged_long <- rbind(cookie_chi_long, trees_chi_long)
+freq_summary <- data.frame(table(merged_long))
+freq_summary$proportion <- ifelse(freq_summary$scale == "cookie", freq_summary$Freq/200, freq_summary$Freq/63)
+# save(freq_summary, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/freq_summary.RData")
+```
+
+# data format - microbe/termite damage at different positions in the tree 
+```{r}
+# convert percentage to proportion for values 0 < x < 1 
+cookie_heights_added_out$prop_hollow <- cookie_heights_added_out$perc_hollow/100
+cookie_heights_added_out$prop_rot <- cookie_heights_added_out$perc_rot/100
+
+# Adding a small constant to avoid 0 and 1 values (Smithson & Verkuilen 2006)
+cookie_heights_added_out$prop_hollow_tr <- 
+  (cookie_heights_added_out$prop_hollow * (nrow(cookie_heights_added_out) - 1) + 0.5) / nrow(cookie_heights_added_out)
+cookie_heights_added_out$prop_rot_tr <- 
+  (cookie_heights_added_out$prop_rot * (nrow(cookie_heights_added_out) - 1) + 0.5) / nrow(cookie_heights_added_out)
+
+# save(cookie_heights_added_out, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/cookie_heights_added_out.RData")
+```
+
+# data format - species differences in microbe/termite damage
+```{r}
+# for damaged trees, what is the extent of whole tree damage on behalf of different decomposers 
+damaged_trees_long <- gather(dam_scaled, condition, measurement, mu_hol_scaled:mu_rot_scaled)
+damaged_trees_long_rep_sp <- damaged_trees_long %>% 
+  filter(species %in%  c("Corymbia sp. (clarksoniana/novoguinensis) ", "Eucalyptus tetrodonta","Lophostemon suaveolens",  "Planchonia careya"))
+# save(damaged_trees_long_rep_sp, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/damaged_trees_long_rep_sp.RData")
+```
+
+# data format - supplementary table of plot level damaged biomass
+```{r}
+all_biomass <- all_biomass[, c('ply_model', 'species', 'obs_ABG_dry_kg')]
+all_biomass <- all_biomass[complete.cases(all_biomass), ]
+
+totbiomass <- sum(all_biomass$obs_ABG_dry_kg)
+
+out <- all_biomass %>% group_by(species) %>% 
+  summarize(total_biomass = sum(obs_ABG_dry_kg),
+            perc_biomass = sum(obs_ABG_dry_kg)/totbiomass*100,
+            n = n())
+
+# divide total biomass by 2.1ha to get per hectare values
+```
+
+# data format - termites sampled 
+```{r}
+tree_termites <- alltermites[alltermites$niche == "trees",]
+table(tree_termites$species_organized)
+
+dw_termites <- alltermites[alltermites$niche == "deadwood",]
+table(dw_termites$species_organized)
+```
+
+# data format - tree-level factors
+```{r}
+# merge in tree size 
+tree_size <- trees[c("ply_model", "dbh_observed_cm_tidy")]
+damaged_trees <- left_join(dam_scaled, tree_size, by = "ply_model")
+
+# merge in wood density
+damaged_trees <- left_join(damaged_trees, field_wd_species, by = c("tree_ID" = "tree_id", "species"))
+
+# save(damaged_trees, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/damaged_trees.RData")
+```
+
+# data format - supplementary table 1
+```{r}
+# total n each species
+table(dam_scaled$species)
+
+# n for different types of damage 
+dam_scaled %>% group_by(species) %>% count(mu_hol_scaled > 0 )
+dam_scaled %>% group_by(species) %>% count(mu_rot_scaled > 0 )
+
+# species level tree level damage mean and sd 
+trees_d <- trees[trees$damaged == "Y",]
+trees_d_stats_sp <- dam_scaled %>% group_by(species) %>% 
+  summarize(mean_mic = mean(mu_rot_scaled), 
+            mean_term = mean(mu_hol_scaled), 
+            sd_mic = sd(mu_rot_scaled), 
+            sd_term = sd(mu_hol_scaled), 
+            n = n())
+
+# overall damage
+trees_d_stats <- dam_scaled %>% 
+  summarize(mean_mic = mean(mu_rot_scaled), 
+            mean_term = mean(mu_hol_scaled), 
+            sd_mic = sd(mu_rot_scaled), 
+            sd_term = sd(mu_hol_scaled), 
+            max_term = max(mu_hol_scaled), 
+            max_mic = max (mu_rot_scaled),
+            n = n())
+
+# how many trees are represented in the cookie df
+tree_summary <- cookie %>%
+  count(tree_ID, name = "count") %>%
+  filter(count > 1)
+```
+
+# data format - damage throughout tree for microbe only
+```{r}
+# 4 trees with microbe only damage 
+mo <- trees[trees$microbe_only == "y",]
+mo_id <- mo$tree_ID
+
+# subset cookie df with heights added 
+mo_cookie <- cookie_heights_added_out[cookie_heights_added_out$tree_ID %in% mo_id, ]
+
+# save(mo_cookie, file="/Users/abbeyyatsko/Desktop/FE_repo/R/data_out/mo_cookie.RData")
+```
+
