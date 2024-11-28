@@ -4,4 +4,4 @@ This repository contains the data and R code to reproduce all analyses of our pa
 
 All code is inside the R directory.
 
-[![DOI](https://zenodo.org/badge/799993336.svg)](https://zenodo.org/10.5281/zenodo.14238875)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14238876.svg)](https://doi.org/10.5281/zenodo.14238876)
